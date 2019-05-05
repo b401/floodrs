@@ -92,15 +92,12 @@ fn write_pixels(pixelflut_infos: Config) -> Result<u128, std::io::Error> {
             let color = pixel
                 .2
                 .data
-                .into_iter()
+                .iter()
                 .map(|s| format!("{:0>2x}", s))
                 .collect::<String>();
-            if color.ends_with("ff") {
-                if pixel.2.data[2] != 0u8 {
-                    pixel_cache.push(
-                        format!("PX {} {} {}\n", x + pixel.0, y + pixel.1, color).into_bytes(),
-                    );
-                };
+            if color.ends_with("ff") && pixel.2.data[2] != 0u8 {
+                pixel_cache
+                    .push(format!("PX {} {} {}\n", x + pixel.0, y + pixel.1, color).into_bytes());
             };
         }
     }
