@@ -1,7 +1,9 @@
 extern crate image;
 
-
+use image::gif::Decoder;
 use image::open;
+use image::AnimationDecoder;
+use std::fs::File;
 use std::io::Write;
 use std::net::TcpStream;
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -10,16 +12,21 @@ use std::time::Instant;
 
 pub struct Config {
     pub server: SocketAddrV4,
-    pub image: image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>,
+    pub image: ImageEnum,
     pub offset: (u32, u32),
     pub rpt: bool,
+}
+
+pub enum ImageEnum {
+    GifImage(image::ImageResult<Vec<image::Frame>>),
+    StaticImage(image::ImageBuffer<image::Rgba<u8>, Vec<u8>>),
 }
 
 impl Config {
     pub fn new(
         ip: &str,
         port: u16,
-        image: image::RgbaImage,
+        image: ImageEnum,
         x_offset: u32,
         y_offset: u32,
         repeat: bool,
@@ -42,41 +49,61 @@ pub fn run(pixelflut_infos: Config) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub fn open_image(image_path: &Path) -> Result<image::RgbaImage, image::ImageError> {
-    let image: Result<image::DynamicImage, image::ImageError> = open(image_path);
-
-    match image {
-        Ok(imagebuffer) => Ok(imagebuffer.to_rgba()),
-        Err(e) => Err(e),
+pub fn open_image(image_path: &Path) -> ImageEnum {
+    match image_path.extension().unwrap().to_str().unwrap() {
+        "gif" => ImageEnum::GifImage(open_gif_image(image_path)),
+        _ => ImageEnum::StaticImage(open(image_path).unwrap().to_rgba()),
     }
+}
+
+fn open_gif_image(image_path: &Path) -> image::ImageResult<Vec<image::Frame>> {
+    let gif_file = File::open(image_path).expect("File not found");
+    let decoder = Decoder::new(gif_file).unwrap();
+    let frames = decoder.into_frames();
+    frames.collect_frames()
 }
 
 fn write_pixels(pixelflut_infos: Config) -> Result<u128, std::io::Error> {
     let con = TcpStream::connect(pixelflut_infos.server);
 
     let (x, y) = pixelflut_infos.offset;
-    let image_pixels = pixelflut_infos.image;
 
     let mut counter = 0;
     let time = Instant::now();
 
     // Caching
     let mut pixel_cache: Vec<Vec<u8>> = Vec::new();
-    for pixel in image_pixels.enumerate_pixels() {
-        pixel_cache.push(
-            format!(
-                "PX {} {} {:0>8}\n",
-                x + pixel.0,
-                y + pixel.1,
-                pixel
-                    .2
-                    .data
-                    .iter()
-                    .map(|s| format!("{:x}", s))
-                    .collect::<String>()
-            )
-            .into_bytes(),
-        );
+    let mut frame_cache: Vec<image::RgbaImage> = Vec::new();
+
+    match pixelflut_infos.image {
+        ImageEnum::StaticImage(pixels) => frame_cache.push(pixels),
+        ImageEnum::GifImage(frameholder) => match frameholder {
+            Ok(frames) => {
+                for frame in frames {
+                    frame_cache.push(frame.into_buffer());
+                }
+            }
+            Err(e) => panic!(e),
+        },
+    };
+
+    for frame in frame_cache {
+        for pixel in frame.enumerate_pixels() {
+            pixel_cache.push(
+                format!(
+                    "PX {} {} {:0>8}\n",
+                    x + pixel.0,
+                    y + pixel.1,
+                    pixel
+                        .2
+                        .data
+                        .iter()
+                        .map(|s| format!("{:x}", s))
+                        .collect::<String>()
+                )
+                .into_bytes(),
+            );
+        }
     }
 
     match con {

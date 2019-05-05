@@ -35,31 +35,31 @@ fn main() -> Result<(), image::ImageError> {
         .arg(
             Arg::with_name("xOffset")
                 .short("x")
+                .takes_value(true)
                 .help("X Offset")
-                .required(false)
-                .index(4),
+                .required(false),
         )
         .arg(
             Arg::with_name("yOffset")
                 .short("y")
+                .takes_value(true)
                 .help("y Offset")
-                .required(false)
-                .index(5),
+                .required(false),
         )
         .arg(
             Arg::with_name("repeat")
-                .short("r")
+                .long("repeat")
+                .takes_value(false)
                 .help("redraw infinitely")
                 .required(false)
-                .min_values(0)
-                .index(6),
+                .min_values(0),
         )
         .get_matches();
 
     let pixelflut_infos = floodrs::Config::new(
         arg.value_of("IP").unwrap_or("127.0.0.1"),
         value_t!(arg.value_of("PORT"), u16).unwrap_or(1234u16),
-        floodrs::open_image(Path::new(arg.value_of("FILE").unwrap()))?,
+        floodrs::open_image(Path::new(arg.value_of("FILE").unwrap())),
         value_t!(arg.value_of("xOffset"), u32).unwrap_or(0u32),
         value_t!(arg.value_of("yOffset"), u32).unwrap_or(0u32),
         arg.is_present("repeat"),
