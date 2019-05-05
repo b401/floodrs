@@ -1,5 +1,6 @@
 extern crate image;
 
+
 use image::open;
 use std::io::Write;
 use std::net::TcpStream;
