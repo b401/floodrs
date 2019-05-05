@@ -89,20 +89,19 @@ fn write_pixels(pixelflut_infos: Config) -> Result<u128, std::io::Error> {
 
     for frame in frame_cache {
         for pixel in frame.enumerate_pixels() {
-            pixel_cache.push(
-                format!(
-                    "PX {} {} {:0>8}\n",
-                    x + pixel.0,
-                    y + pixel.1,
-                    pixel
-                        .2
-                        .data
-                        .iter()
-                        .map(|s| format!("{:x}", s))
-                        .collect::<String>()
-                )
-                .into_bytes(),
-            );
+            let color = pixel
+                .2
+                .data
+                .into_iter()
+                .map(|s| format!("{:0>2x}", s))
+                .collect::<String>();
+            if color.ends_with("ff") {
+                if pixel.2.data[2] != 0u8 {
+                    pixel_cache.push(
+                        format!("PX {} {} {}\n", x + pixel.0, y + pixel.1, color).into_bytes(),
+                    );
+                };
+            };
         }
     }
 
